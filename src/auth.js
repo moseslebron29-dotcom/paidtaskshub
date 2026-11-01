@@ -12,6 +12,8 @@ const {
 
 const router = express.Router();
 
+const ADMIN_EMAIL = 'moseslebron29@gmail.com';
+
 const limiter = (max, windowMinutes) => rateLimit({
     windowMs: windowMinutes * 60 * 1000,
     max,
@@ -19,6 +21,10 @@ const limiter = (max, windowMinutes) => rateLimit({
     legacyHeaders: false,
     message: { error: 'Too many attempts. Please try again later.' }
 });
+
+function isAdminEmail(email) {
+    return String(email || '').trim().toLowerCase() === ADMIN_EMAIL;
+}
 
 async function sendOtpEmail(email, otp) {
     const apiKey = process.env.BREVO_API_KEY;
@@ -310,10 +316,17 @@ router.post('/verify-email', limiter(20, 15), async (req, res) => {
             return res.status(400).json({ error: 'Incorrect verification code.' });
         }
 
+        const adminAccount = isAdminEmail(user.email);
+
         await pool.query(
-            `UPDATE users SET verified = true, active = true,
-             otp_hash = NULL, otp_expires = NULL WHERE id = $1`,
-            [user.id]
+            `UPDATE users
+             SET verified = true,
+                 active = $1,
+                 is_admin = CASE WHEN $2 THEN true ELSE is_admin END,
+                 otp_hash = NULL,
+                 otp_expires = NULL
+             WHERE id = $3`,
+            [adminAccount, adminAccount, user.id]
         );
 
         req.session.userId = user.id;
@@ -328,7 +341,10 @@ router.post('/verify-email', limiter(20, 15), async (req, res) => {
                 });
             }
 
-            res.json({ message: 'Email verified successfully.' });
+            res.json({
+                message: 'Email verified successfully.',
+                requiresActivation: !adminAccount
+            });
         });
     } catch (error) {
         console.error(error);
@@ -365,7 +381,6 @@ router.post('/login', limiter(15, 15), async (req, res) => {
             });
         }
 
-        // New session id after login prevents session fixation.
         req.session.regenerate(err => {
             if (err) {
                 return res.status(500).json({
@@ -391,7 +406,7 @@ router.post('/login', limiter(15, 15), async (req, res) => {
     }
 });
 
-// Lightweight "am I logged in?" probe for the login page (never returns 401).
+// SESSION CHECK
 router.get('/session', (req, res) => {
     res.json({ loggedIn: !!(req.session && req.session.userId) });
 });
