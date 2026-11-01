@@ -1,0 +1,11 @@
+const $ = s => document.querySelector(s);
+const auth = $('#auth'), dashboard = $('#dashboard'), message = $('#authMessage');
+function showForm(which){['loginForm','registerForm','otpForm'].forEach(id=>$('#'+id).classList.toggle('hidden',id!==which));$('#loginTab').classList.toggle('selected',which==='loginForm');$('#registerTab').classList.toggle('selected',which==='registerForm');message.textContent='';}
+$('#loginTab').onclick=()=>showForm('loginForm');$('#registerTab').onclick=()=>showForm('registerForm');
+async function post(url,data){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const j=await r.json();if(!r.ok)throw new Error(j.error||'Something went wrong');return j;}
+async function loadDashboard(){const r=await fetch('/api/me');if(!r.ok){auth.classList.remove('hidden');dashboard.classList.add('hidden');return;}const j=await r.json();auth.classList.add('hidden');dashboard.classList.remove('hidden');$('#welcome').textContent='Hello, '+j.user.fullName;$('#balance').textContent='KSh '+j.dashboard.displayedBalance.toLocaleString('en-KE');$('#completed').textContent=j.dashboard.completedTasks;$('#pending').textContent=j.dashboard.pendingTasks;$('#emailView').textContent='Email: '+j.user.email;$('#statusView').textContent='Account status: '+(j.user.active?'Active':'Email verified — activation not yet completed');}
+$('#loginForm').onsubmit=async e=>{e.preventDefault();message.textContent='';try{const d=Object.fromEntries(new FormData(e.target));await post('/api/login',d);await loadDashboard();}catch(err){message.textContent=err.message;}};
+$('#registerForm').onsubmit=async e=>{e.preventDefault();message.textContent='';try{const d=Object.fromEntries(new FormData(e.target));await post('/api/register',d);$('#otpForm [name=email]').value=d.email;showForm('otpForm');message.textContent='';}catch(err){message.textContent=err.message;}};
+$('#otpForm').onsubmit=async e=>{e.preventDefault();message.textContent='';try{const d=Object.fromEntries(new FormData(e.target));await post('/api/verify-email',d);await loadDashboard();}catch(err){message.textContent=err.message;}};
+$('#logout').onclick=async()=>{await post('/api/logout',{});dashboard.classList.add('hidden');auth.classList.remove('hidden');showForm('loginForm');};
+loadDashboard();
