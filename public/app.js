@@ -1,4 +1,4 @@
-const $ = (selector) => document.querySelector(selector);
+const $ = s => document.querySelector(s);
 
 const auth = $('#auth');
 const dashboard = $('#dashboard');
@@ -6,14 +6,13 @@ const message = $('#authMessage');
 
 function showForm(which) {
     ['loginForm', 'registerForm', 'otpForm'].forEach(id => {
-        const form = $('#' + id);
-        if (form) form.classList.toggle('hidden', id !== which);
+        $('#' + id).classList.toggle('hidden', id !== which);
     });
 
-    $('#loginTab')?.classList.toggle('selected', which === 'loginForm');
-    $('#registerTab')?.classList.toggle('selected', which === 'registerForm');
+    $('#loginTab').classList.toggle('selected', which === 'loginForm');
+    $('#registerTab').classList.toggle('selected', which === 'registerForm');
 
-    if (message) message.textContent = '';
+    message.textContent = '';
 }
 
 $('#loginTab').onclick = () => showForm('loginForm');
@@ -38,14 +37,13 @@ async function post(url, data) {
     return result;
 }
 
-// LOAD USER DASHBOARD
 async function loadDashboard() {
     const response = await fetch('/api/me', {
         credentials: 'same-origin'
     });
 
     if (!response.ok) {
-        throw new Error('Could not load your dashboard. Please log in again.');
+        throw new Error('Please log in.');
     }
 
     const result = await response.json();
@@ -72,69 +70,139 @@ async function loadDashboard() {
         'Account status: ' +
         (result.user.active
             ? 'Active'
-            : 'Email verified — activation not yet completed');
+            : 'Email verified — activation not completed');
 }
 
+// OPEN OTP FORM
+function openOtp(email) {
+    $('#otpForm [name="email"]').value = email;
+    showForm('otpForm');
+    message.textContent = 'Enter the verification code sent to your email.';
+}
+
+// REGISTER
+$('#registerForm').onsubmit = async e => {
+    e.preventDefault();
+
+    message.textContent = 'Creating account...';
+
+    try {
+        const data = Object.fromEntries(new FormData(e.target));
+
+        await post('/api/register', data);
+
+        openOtp(data.email);
+
+    } catch (error) {
+        message.textContent = error.message;
+    }
+};
+
 // LOGIN
-$('#loginForm').onsubmit = async (event) => {
-    event.preventDefault();
+$('#loginForm').onsubmit = async e => {
+    e.preventDefault();
+
     message.textContent = 'Signing in...';
 
     try {
-        const data = Object.fromEntries(new FormData(event.target));
+        const data = Object.fromEntries(new FormData(e.target));
 
         await post('/api/login', data);
 
         await loadDashboard();
 
-        message.textContent = '';
-
     } catch (error) {
         message.textContent = error.message;
     }
 };
 
-// REGISTER
-$('#registerForm').onsubmit = async (event) => {
-    event.preventDefault();
-    message.textContent = 'Creating your account...';
+// VERIFY OTP
+$('#otpForm').onsubmit = async e => {
+    e.preventDefault();
+
+    message.textContent = 'Verifying code...';
 
     try {
-        const data = Object.fromEntries(new FormData(event.target));
-
-        await post('/api/register', data);
-
-        $('#otpForm [name="email"]').value = data.email;
-
-        showForm('otpForm');
-
-        message.textContent =
-            'A verification code has been sent to your email.';
-
-    } catch (error) {
-        message.textContent = error.message;
-    }
-};
-
-// EMAIL VERIFICATION
-$('#otpForm').onsubmit = async (event) => {
-    event.preventDefault();
-
-    message.textContent = 'Verifying your email...';
-
-    try {
-        const data = Object.fromEntries(new FormData(event.target));
+        const data = Object.fromEntries(new FormData(e.target));
 
         await post('/api/verify-email', data);
 
-        message.textContent = 'Email verified! Opening your dashboard...';
+        message.textContent = 'Verified! Opening dashboard...';
 
         await loadDashboard();
 
-        message.textContent = '';
+    } catch (error) {
+        message.textContent = error.message;
+    }
+};
+
+// RESEND OTP BUTTON
+const resendButton = document.createElement('button');
+
+resendButton.type = 'button';
+resendButton.textContent = 'Resend verification code';
+resendButton.style.marginTop = '12px';
+
+$('#otpForm').appendChild(resendButton);
+
+resendButton.onclick = async () => {
+    const email = $('#otpForm [name="email"]').value.trim();
+
+    if (!email) {
+        message.textContent = 'Enter your email address.';
+        return;
+    }
+
+    resendButton.disabled = true;
+    message.textContent = 'Sending a new code...';
+
+    try {
+        const result = await post('/api/resend-otp', { email });
+
+        message.textContent = result.message;
 
     } catch (error) {
         message.textContent = error.message;
+
+    } finally {
+        setTimeout(() => {
+            resendButton.disabled = false;
+        }, 60000);
+    }
+};
+
+// RESEND OTP FROM LOGIN
+const loginResend = document.createElement('button');
+
+loginResend.type = 'button';
+loginResend.textContent = 'Resend verification code';
+loginResend.style.marginTop = '12px';
+
+$('#loginForm').appendChild(loginResend);
+
+loginResend.onclick = async () => {
+    const email = $('#loginForm [name="email"]').value.trim();
+
+    if (!email) {
+        message.textContent = 'Enter your registered email first.';
+        return;
+    }
+
+    loginResend.disabled = true;
+    message.textContent = 'Requesting verification code...';
+
+    try {
+        await post('/api/resend-otp', { email });
+
+        openOtp(email);
+
+    } catch (error) {
+        message.textContent = error.message;
+
+    } finally {
+        setTimeout(() => {
+            loginResend.disabled = false;
+        }, 60000);
     }
 };
 
@@ -148,18 +216,16 @@ $('#logout').onclick = async () => {
 
         showForm('loginForm');
 
-        message.textContent = 'You have logged out successfully.';
-
     } catch (error) {
         message.textContent = error.message;
     }
 };
 
-// CHECK EXISTING LOGIN SESSION
-(async function initialize() {
+// INITIAL PAGE LOAD
+(async () => {
     try {
         await loadDashboard();
-    } catch (error) {
+    } catch {
         auth.classList.remove('hidden');
         dashboard.classList.add('hidden');
         showForm('loginForm');
