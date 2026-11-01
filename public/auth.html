@@ -1,4 +1,5 @@
 <!doctype html>
+
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -6,82 +7,454 @@
 <title>Log in or join – PaidTasksHub</title>
 <meta name="theme-color" content="#0b1b34">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
-<div class="auth-wrap">
-    <aside class="auth-side">
-        <a class="brand" href="/"><span class="brand-mark">P</span><span>PaidTasks<b>Hub</b></span></a>
-        <div>
-            <h2>Tasks, referrals and M-Pesa withdrawals.</h2>
-            <p>Join for free. No activation fee. Every reward and withdrawal is recorded in your wallet history.</p>
+<link rel="stylesheet" href="/css/style.css"><style>
+.pth-ad-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(5,12,24,.97);
+}
+
+.pth-ad-overlay.is-visible {
+    display: flex;
+}
+
+.pth-ad-card {
+    width: min(100%,440px);
+    max-height: 95vh;
+    overflow: auto;
+    text-align: center;
+    color: #fff;
+    background: #101d31;
+    border: 1px solid #293b55;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 20px 70px #0009;
+}
+
+.pth-ad-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.pth-ad-brand {
+    font-weight: 800;
+    font-size: 18px;
+}
+
+.pth-ad-label {
+    font-size: 11px;
+    letter-spacing: .08em;
+    color: #c6d2e2;
+    background: #26364d;
+    border-radius: 20px;
+    padding: 6px 10px;
+}
+
+.pth-ad-video {
+    display: block;
+    width: 100%;
+    max-height: 62vh;
+    object-fit: contain;
+    background: #000;
+    border-radius: 12px;
+}
+
+.pth-ad-title {
+    font-size: 19px;
+    margin: 14px 0 6px;
+}
+
+.pth-ad-copy {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #c0ccdc;
+    margin: 0 0 14px;
+}
+
+.pth-ad-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pth-ad-btn {
+    border: 0;
+    border-radius: 9px;
+    padding: 13px 10px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.pth-ad-exit {
+    background: #33445d;
+    color: #fff;
+}
+
+.pth-ad-continue {
+    background: #16a36a;
+    color: #fff;
+}
+
+.pth-ad-continue:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.pth-ad-note {
+    font-size: 11px;
+    color: #9eacc0;
+    margin: 12px 0 0;
+}
+
+@media(max-width:420px) {
+    .pth-ad-card {
+        padding: 12px;
+    }
+
+    .pth-ad-video {
+        max-height: 57vh;
+    }
+
+    .pth-ad-actions {
+        grid-template-columns: 1fr;
+    }
+}
+</style></head><body><!-- REGISTRATION ADVERTISEMENT --><div class="pth-ad-overlay" id="pthRegistrationAd"
+     aria-label="Advertisement" aria-modal="true" role="dialog"><div class="pth-ad-card">
+
+    <div class="pth-ad-top">
+        <span class="pth-ad-brand">PaidTasksHub</span>
+        <span class="pth-ad-label">ADVERTISEMENT</span>
+    </div>
+
+    <video class="pth-ad-video"
+           id="pthAdVideo"
+           src="/media/71075.mp4"
+           autoplay muted playsinline preload="auto" controls>
+    </video>
+
+    <h2 class="pth-ad-title">Sponsored video</h2>
+
+    <p class="pth-ad-copy">
+        Watch this advertisement before continuing
+        to create your PaidTasksHub account.
+    </p>
+
+    <div class="pth-ad-actions">
+
+        <button class="pth-ad-btn pth-ad-continue"
+                id="pthAdContinue"
+                type="button" disabled>
+            Continue after advert
+        </button>
+
+        <button class="pth-ad-btn pth-ad-exit"
+                id="pthAdExit" type="button">
+            ✕ Exit Ad
+        </button>
+
+    </div>
+
+    <p class="pth-ad-note">
+        You can exit the advertisement at any time.
+    </p>
+
+</div>
+
+</div><!-- AUTHENTICATION PAGE --><div class="auth-wrap"><aside class="auth-side">
+
+    <a class="brand" href="/">
+        <span class="brand-mark">P</span>
+        <span>PaidTasks<b>Hub</b></span>
+    </a>
+
+    <div>
+        <h2>Tasks, referrals and M-Pesa withdrawals.</h2>
+
+        <p>
+            Create your account, complete email verification
+            and activate your account with a one-time
+            KSh 150 payment.
+        </p>
+    </div>
+
+    <p class="small" style="color:#64748b">
+        © PaidTasksHub
+    </p>
+
+</aside>
+
+
+<main class="auth-main">
+
+    <div class="auth-card">
+
+        <a class="brand auth-mobile-brand" href="/">
+            <span class="brand-mark">P</span>
+            <span>PaidTasks<b>Hub</b></span>
+        </a>
+
+        <div class="tabs" id="tabs" role="tablist">
+
+            <button type="button" id="loginTab"
+                    class="selected" role="tab">
+                Log in
+            </button>
+
+            <button type="button" id="registerTab"
+                    role="tab">
+                Create account
+            </button>
+
         </div>
-        <p class="small" style="color:#64748b">© PaidTasksHub</p>
-    </aside>
 
-    <main class="auth-main">
-        <div class="auth-card">
-            <a class="brand auth-mobile-brand" href="/"><span class="brand-mark">P</span><span>PaidTasks<b>Hub</b></span></a>
+        <div id="authMessage"
+             class="alert hidden"
+             role="status"
+             aria-live="polite">
+        </div>
 
-            <div class="tabs" id="tabs" role="tablist">
-                <button type="button" id="loginTab" class="selected" role="tab">Log in</button>
-                <button type="button" id="registerTab" role="tab">Create account</button>
+
+        <!-- LOGIN FORM -->
+        <form id="loginForm" novalidate>
+
+            <h2 style="font-size:22px">
+                Welcome back
+            </h2>
+
+            <label class="field">
+                <span>Email</span>
+                <input name="email" type="email"
+                       required autocomplete="email"
+                       inputmode="email">
+            </label>
+
+            <label class="field">
+                <span>Password</span>
+                <input name="password" type="password"
+                       required autocomplete="current-password">
+            </label>
+
+            <button class="btn btn-primary btn-block"
+                    type="submit">
+                Log in
+            </button>
+
+            <p class="center small" style="margin:14px 0 0">
+                Email not verified?
+                <button type="button" class="link-btn"
+                        id="loginResend">
+                    Resend verification code
+                </button>
+            </p>
+
+        </form>
+
+
+        <!-- REGISTRATION FORM -->
+        <form id="registerForm" class="hidden" novalidate>
+
+            <h2 style="font-size:22px">
+                Create your account
+            </h2>
+
+            <label class="field">
+                <span>Full name</span>
+                <input name="fullName" required
+                       autocomplete="name">
+            </label>
+
+            <label class="field">
+                <span>Username</span>
+                <input name="username" required
+                       autocomplete="username"
+                       autocapitalize="none" maxlength="30">
+
+                <small class="hint">
+                    3–30 letters, numbers, dot, dash or underscore.
+                </small>
+            </label>
+
+            <label class="field">
+                <span>Email</span>
+                <input name="email" type="email"
+                       required autocomplete="email"
+                       inputmode="email">
+
+                <small class="hint">
+                    We send a 6-digit verification code here.
+                </small>
+            </label>
+
+            <label class="field">
+                <span>M-Pesa phone number</span>
+                <input name="phone" type="tel" required
+                       placeholder="07XXXXXXXX"
+                       autocomplete="tel" inputmode="tel">
+
+                <small class="hint">
+                    Withdrawals are paid to this number.
+                </small>
+            </label>
+
+            <div class="row">
+
+                <label class="field">
+                    <span>Password</span>
+                    <input name="password" type="password"
+                           required minlength="8"
+                           autocomplete="new-password">
+                </label>
+
+                <label class="field">
+                    <span>Confirm password</span>
+                    <input name="confirmPassword"
+                           type="password" required
+                           minlength="8"
+                           autocomplete="new-password">
+                </label>
+
             </div>
 
-            <div id="authMessage" class="alert hidden" role="status" aria-live="polite"></div>
+            <label class="field">
+                <span>
+                    Referral code
+                    <em class="muted" style="font-weight:400">
+                        (optional)
+                    </em>
+                </span>
 
-            <form id="loginForm" novalidate>
-                <h2 style="font-size:22px">Welcome back</h2>
-                <label class="field"><span>Email</span>
-                    <input name="email" type="email" required autocomplete="email" inputmode="email"></label>
-                <label class="field"><span>Password</span>
-                    <input name="password" type="password" required autocomplete="current-password"></label>
-                <button class="btn btn-primary btn-block" type="submit">Log in</button>
-                <p class="center small" style="margin:14px 0 0">
-                    Email not verified? <button type="button" class="link-btn" id="loginResend">Resend verification code</button>
-                </p>
-            </form>
+                <input name="ref"
+                       autocapitalize="characters"
+                       maxlength="12">
+            </label>
 
-            <form id="registerForm" class="hidden" novalidate>
-                <h2 style="font-size:22px">Create your account</h2>
-                <label class="field"><span>Full name</span>
-                    <input name="fullName" required autocomplete="name"></label>
-                <label class="field"><span>Username</span>
-                    <input name="username" required autocomplete="username" autocapitalize="none" maxlength="30">
-                    <small class="hint">3–30 letters, numbers, dot, dash or underscore.</small></label>
-                <label class="field"><span>Email</span>
-                    <input name="email" type="email" required autocomplete="email" inputmode="email">
-                    <small class="hint">We send a 6-digit verification code here.</small></label>
-                <label class="field"><span>M-Pesa phone number</span>
-                    <input name="phone" type="tel" required placeholder="07XXXXXXXX" autocomplete="tel" inputmode="tel">
-                    <small class="hint">Withdrawals are paid to this number.</small></label>
-                <div class="row">
-                    <label class="field"><span>Password</span>
-                        <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
-                    <label class="field"><span>Confirm password</span>
-                        <input name="confirmPassword" type="password" required minlength="8" autocomplete="new-password"></label>
-                </div>
-                <label class="field"><span>Referral code <em class="muted" style="font-weight:400">(optional)</em></span>
-                    <input name="ref" autocapitalize="characters" maxlength="12"></label>
-                <button class="btn btn-primary btn-block" type="submit">Create account</button>
-                <p class="center small muted" style="margin:14px 0 0">Registration is free. We never ask you to pay to unlock your account.</p>
-            </form>
+            <button class="btn btn-primary btn-block"
+                    type="submit">
+                Create account
+            </button>
 
-            <form id="otpForm" class="hidden" novalidate>
-                <h2 style="font-size:22px">Verify your email</h2>
-                <p class="muted">Enter the 6-digit code we sent to your email. It expires in 5 minutes.</p>
-                <label class="field"><span>Email</span>
-                    <input name="email" type="email" required autocomplete="email" inputmode="email"></label>
-                <label class="field"><span>6-digit code</span>
-                    <input class="otp-input" name="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label>
-                <button class="btn btn-primary btn-block" type="submit">Verify email</button>
-                <p class="center small" style="margin:14px 0 0">
-                    <button type="button" class="link-btn" id="otpResend">Resend verification code</button>
-                </p>
-            </form>
-        </div>
-    </main>
-</div>
-<script src="/js/auth.js"></script>
-</body>
-</html>
+            <p class="center small muted"
+               style="margin:14px 0 0">
+                A one-time KSh 150 activation payment is required
+                after email verification to access tasks.
+            </p>
+
+        </form>
+
+
+        <!-- EMAIL VERIFICATION FORM -->
+        <form id="otpForm" class="hidden" novalidate>
+
+            <h2 style="font-size:22px">
+                Verify your email
+            </h2>
+
+            <p class="muted">
+                Enter the 6-digit code we sent to your email.
+                It expires in 5 minutes.
+            </p>
+
+            <label class="field">
+                <span>Email</span>
+                <input name="email" type="email"
+                       required autocomplete="email"
+                       inputmode="email">
+            </label>
+
+            <label class="field">
+                <span>6-digit code</span>
+                <input class="otp-input" name="otp"
+                       inputmode="numeric"
+                       pattern="[0-9]{6}"
+                       maxlength="6" required
+                       autocomplete="one-time-code">
+            </label>
+
+            <button class="btn btn-primary btn-block"
+                    type="submit">
+                Verify email
+            </button>
+
+            <p class="center small" style="margin:14px 0 0">
+                <button type="button" class="link-btn"
+                        id="otpResend">
+                    Resend verification code
+                </button>
+            </p>
+
+        </form>
+
+    </div>
+
+</main>
+
+</div><!-- ADVERTISEMENT SCRIPT --><script>
+(function () {
+
+    var params = new URLSearchParams(window.location.search);
+
+    var isRegistrationEntry =
+        params.get('tab') === 'register' ||
+        params.has('ref');
+
+    if (!isRegistrationEntry) return;
+
+    var overlay = document.getElementById('pthRegistrationAd');
+    var video = document.getElementById('pthAdVideo');
+    var exit = document.getElementById('pthAdExit');
+    var proceed = document.getElementById('pthAdContinue');
+
+    var closed = false;
+
+    function closeAd() {
+
+        if (closed) return;
+
+        closed = true;
+
+        overlay.classList.remove('is-visible');
+        overlay.setAttribute('aria-hidden', 'true');
+
+        video.pause();
+    }
+
+    overlay.classList.add('is-visible');
+    overlay.setAttribute('aria-hidden', 'false');
+
+    exit.addEventListener('click', closeAd);
+    proceed.addEventListener('click', closeAd);
+
+    video.addEventListener('ended', function () {
+
+        proceed.disabled = false;
+        proceed.textContent = 'Continue to Registration';
+
+    });
+
+    video.addEventListener('error', function () {
+
+        proceed.disabled = false;
+        proceed.textContent = 'Continue to Registration';
+
+    });
+
+    video.play().catch(function () {
+
+        proceed.disabled = false;
+        proceed.textContent = 'Continue to Registration';
+
+    });
+
+})();
+</script><!-- ORIGINAL AUTHENTICATION JAVASCRIPT --><script src="/js/auth.js"></script></body>
+                    </html>
