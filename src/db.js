@@ -5,17 +5,12 @@ const path = require('path');
 const crypto = require('crypto');
 const { Pool, types } = require('pg');
 
-// BIGINT columns (money in cents, counts) come back as numbers, not strings.
 types.setTypeParser(20, v => parseInt(v, 10));
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
-    console.error(
-        'DATABASE_URL is not set. Create a free Postgres database ' +
-        '(for example at neon.tech) and add its connection string as the ' +
-        'DATABASE_URL environment variable on Render.'
-    );
+    console.error('DATABASE_URL is not set.');
     process.exit(1);
 }
 
@@ -28,7 +23,11 @@ const pool = new Pool({
     idleTimeoutMillis: 30000
 });
 
-pool.on('error', err => console.error('Postgres pool error:', err.message));
+pool.on('error', err =>
+    console.error('Postgres pool error:', err.message)
+);
+
+const ADMIN_EMAIL = 'moseslebron29@gmail.com';
 
 const SETTING_DEFAULTS = {
     min_withdrawal_kes: 150,
@@ -57,6 +56,8 @@ CREATE TABLE IF NOT EXISTS users (
     active BOOLEAN NOT NULL DEFAULT false,
     status TEXT NOT NULL DEFAULT 'active',
     is_admin BOOLEAN NOT NULL DEFAULT false,
+    activation_paid BOOLEAN NOT NULL DEFAULT false,
+    activation_paid_at TIMESTAMPTZ,
     otp_hash TEXT,
     otp_expires BIGINT,
     otp_attempts INT NOT NULL DEFAULT 0,
@@ -67,9 +68,21 @@ CREATE TABLE IF NOT EXISTS users (
     referred_by TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq ON users (lower(email));
-CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq ON users (lower(username));
-CREATE UNIQUE INDEX IF NOT EXISTS users_refcode_uq ON users (referral_code);
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS activation_paid BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS activation_paid_at TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq
+ON users (lower(email));
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq
+ON users (lower(username));
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_refcode_uq
+ON users (referral_code);
 
 CREATE TABLE IF NOT EXISTS ledger (
     id BIGSERIAL PRIMARY KEY,
@@ -80,8 +93,13 @@ CREATE TABLE IF NOT EXISTS ledger (
     note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ledger_ref_uq ON ledger (user_id, type, ref) WHERE ref IS NOT NULL;
-CREATE INDEX IF NOT EXISTS ledger_user_idx ON ledger (user_id, id DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ledger_ref_uq
+ON ledger (user_id, type, ref)
+WHERE ref IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS ledger_user_idx
+ON ledger (user_id, id DESC);
 
 CREATE TABLE IF NOT EXISTS tasks (
     id BIGSERIAL PRIMARY KEY,
@@ -115,7 +133,9 @@ CREATE TABLE IF NOT EXISTS math_attempts (
     used BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS math_user_idx ON math_attempts (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS math_user_idx
+ON math_attempts (user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS withdrawals (
     id BIGSERIAL PRIMARY KEY,
@@ -130,8 +150,35 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS wd_open_uq ON withdrawals (user_id) WHERE status IN ('pending','approved','processing');
-CREATE UNIQUE INDEX IF NOT EXISTS wd_orig_uq ON withdrawals (originator_id) WHERE originator_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS wd_open_uq
+ON withdrawals (user_id)
+WHERE status IN ('pending','approved','processing');
+
+CREATE UNIQUE INDEX IF NOT EXISTS wd_orig_uq
+ON withdrawals (originator_id)
+WHERE originator_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS activation_payments (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    amount BIGINT NOT NULL,
+    phone TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    merchant_request_id TEXT,
+    checkout_request_id TEXT UNIQUE,
+    mpesa_receipt TEXT UNIQUE,
+    result_description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    paid_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS activation_payments_user_idx
+ON activation_payments (user_id, id DESC);
+
+CREATE INDEX IF NOT EXISTS activation_payments_status_idx
+ON activation_payments (status);
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -156,7 +203,10 @@ async function withTx(fn) {
         await client.query('COMMIT');
         return result;
     } catch (error) {
-        try { await client.query('ROLLBACK'); } catch (_) { /* ignore */ }
+        try {
+            await client.query('ROLLBACK');
+        } catch (_) {}
+
         throw error;
     } finally {
         client.release();
@@ -165,7 +215,11 @@ async function withTx(fn) {
 
 async function getSettings(client) {
     const db = client || pool;
-    const { rows } = await db.query('SELECT key, value FROM settings');
+
+    const { rows } = await db.query(
+        'SELECT key, value FROM settings'
+    );
+
     const out = { ...SETTING_DEFAULTS };
 
     for (const row of rows) {
@@ -190,8 +244,10 @@ async function setSetting(key, value, client) {
     const db = client || pool;
 
     await db.query(
-        `INSERT INTO settings (key, value) VALUES ($1, $2)
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        `INSERT INTO settings (key, value)
+         VALUES ($1, $2)
+         ON CONFLICT (key)
+         DO UPDATE SET value = EXCLUDED.value`,
         [key, String(value)]
     );
 }
@@ -200,7 +256,8 @@ async function balanceOf(userId, client) {
     const db = client || pool;
 
     const { rows } = await db.query(
-        'SELECT COALESCE(SUM(amount), 0)::bigint AS balance FROM ledger WHERE user_id = $1',
+        `SELECT COALESCE(SUM(amount), 0)::bigint AS balance
+         FROM ledger WHERE user_id = $1`,
         [userId]
     );
 
@@ -211,14 +268,20 @@ async function audit(actor, action, detail, client) {
     const db = client || pool;
 
     await db.query(
-        'INSERT INTO audit_log (actor, action, detail) VALUES ($1, $2, $3)',
-        [actor || null, action, detail ? String(detail).slice(0, 500) : null]
+        `INSERT INTO audit_log (actor, action, detail)
+         VALUES ($1, $2, $3)`,
+        [
+            actor || null,
+            action,
+            detail ? String(detail).slice(0, 500) : null
+        ]
     );
 }
 
 function newReferralCode() {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const bytes = crypto.randomBytes(8);
+
     let code = '';
 
     for (let i = 0; i < 8; i++) {
@@ -228,8 +291,6 @@ function newReferralCode() {
     return code;
 }
 
-// Imports accounts from the old data/users.json file (if it still exists)
-// without touching passwords: existing bcrypt hashes are copied as they are.
 async function importLegacyUsers() {
     const file = process.env.LEGACY_USERS_FILE ||
         path.join(__dirname, '..', 'data', 'users.json');
@@ -241,7 +302,10 @@ async function importLegacyUsers() {
     try {
         list = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (error) {
-        console.error('Could not read legacy users file:', error.message);
+        console.error(
+            'Could not read legacy users file:',
+            error.message
+        );
         return 0;
     }
 
@@ -250,15 +314,19 @@ async function importLegacyUsers() {
     let imported = 0;
 
     for (const u of list) {
-        if (!u || !u.email || !u.username || !u.passwordHash) continue;
+        if (!u || !u.email || !u.username || !u.passwordHash) {
+            continue;
+        }
 
         try {
             const result = await pool.query(
                 `INSERT INTO users
-                 (id, full_name, username, email, phone, password_hash,
-                  verified, active, otp_hash, otp_expires, otp_attempts,
-                  last_otp_sent_at, referral_code, created_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                 (id, full_name, username, email, phone,
+                  password_hash, verified, active, otp_hash,
+                  otp_expires, otp_attempts, last_otp_sent_at,
+                  referral_code, created_at)
+                 VALUES
+                 ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
                  ON CONFLICT DO NOTHING`,
                 [
                     u.id || crypto.randomUUID(),
@@ -274,18 +342,25 @@ async function importLegacyUsers() {
                     u.otpAttempts || 0,
                     u.lastOtpSentAt || null,
                     newReferralCode(),
-                    u.createdAt ? new Date(u.createdAt) : new Date()
+                    u.createdAt
+                        ? new Date(u.createdAt)
+                        : new Date()
                 ]
             );
 
             imported += result.rowCount;
         } catch (error) {
-            console.error('Skipped legacy user:', error.message);
+            console.error(
+                'Skipped legacy user:',
+                error.message
+            );
         }
     }
 
     if (imported > 0) {
-        console.log(`Imported ${imported} existing account(s) from users.json`);
+        console.log(
+            `Imported ${imported} existing account(s) from users.json`
+        );
     }
 
     return imported;
@@ -294,7 +369,6 @@ async function importLegacyUsers() {
 async function migrate() {
     await pool.query(SCHEMA);
 
-    // Give every account a referral code (older accounts have none).
     const { rows } = await pool.query(
         'SELECT id FROM users WHERE referral_code IS NULL'
     );
@@ -303,9 +377,12 @@ async function migrate() {
         for (let attempt = 0; attempt < 5; attempt++) {
             try {
                 await pool.query(
-                    'UPDATE users SET referral_code = $1 WHERE id = $2',
+                    `UPDATE users
+                     SET referral_code = $1
+                     WHERE id = $2`,
                     [newReferralCode(), row.id]
                 );
+
                 break;
             } catch (error) {
                 if (error.code !== '23505') throw error;
@@ -315,25 +392,38 @@ async function migrate() {
 
     await importLegacyUsers();
 
-    // Accounts that finished email verification are active members.
+    // Email verification remains separate from activation payment.
     await pool.query(
-        'UPDATE users SET active = true WHERE verified = true AND active = false'
+        `UPDATE users
+         SET active = true
+         WHERE verified = true AND active = false`
     );
 
-    // Admins are set only through the ADMIN_EMAILS environment variable.
-    const adminEmails = String(process.env.ADMIN_EMAILS || '')
-        .split(',')
-        .map(e => e.trim().toLowerCase())
-        .filter(Boolean);
+    const adminEmails = [
+        ADMIN_EMAIL,
+        ...String(process.env.ADMIN_EMAILS || '')
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(Boolean)
+    ];
 
-    await pool.query('UPDATE users SET is_admin = false');
+    const uniqueAdminEmails = [...new Set(adminEmails)];
 
-    if (adminEmails.length) {
-        await pool.query(
-            'UPDATE users SET is_admin = true WHERE lower(email) = ANY($1) AND verified = true',
-            [adminEmails]
-        );
-    }
+    await pool.query(
+        'UPDATE users SET is_admin = false'
+    );
+
+    await pool.query(
+        `UPDATE users
+         SET is_admin = true,
+             activation_paid = true,
+             activation_paid_at = COALESCE(activation_paid_at, now())
+         WHERE lower(email) = ANY($1)
+         AND verified = true`,
+        [uniqueAdminEmails]
+    );
+
+    console.log('Database migration completed.');
 }
 
 module.exports = {
