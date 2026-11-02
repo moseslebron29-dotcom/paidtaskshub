@@ -42,6 +42,7 @@ app.use(helmet({
             scriptSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", 'data:'],
+            mediaSrc: ["'self'"],
             connectSrc: ["'self'"],
             formAction: ["'self'"],
             frameAncestors: ["'none'"],
@@ -107,15 +108,56 @@ app.use('/api', (req, res) => {
     res.status(404).json({ error: 'Not found.' });
 });
 
-// Member area: only for logged-in visitors.
-app.get('/app', (req, res) => {
-    if (!req.session || !req.session.userId) {
-        return res.redirect('/auth');
-    }
+// ---------- PAGE ACCESS CONTROL (server-side) ----------
+// Not logged in -> /auth. Email not verified -> /auth (verify).
+// Verified but unpaid -> /activation. Paid member or admin -> allowed.
+async function pageUser(req) {
+    if (!req.session || !req.session.userId) return null;
 
+    const { rows } = await pool.query(
+        'SELECT id, verified, is_admin, activation_paid, status FROM users WHERE id = $1',
+        [req.session.userId]
+    );
+
+    return rows[0] || null;
+}
+
+function sendView(res, file) {
     res.set('Cache-Control', 'no-store');
-    res.sendFile(path.join(__dirname, 'views', 'app.html'));
-});
+    res.sendFile(path.join(__dirname, 'views', file));
+}
+
+function gate(kind) {
+    return async (req, res, next) => {
+        try {
+            const u = await pageUser(req);
+
+            if (!u || u.status !== 'active') return res.redirect('/auth');
+            if (!u.verified) return res.redirect('/auth?verify=1');
+
+            const admin = !!u.is_admin;
+            const activated = admin || !!u.activation_paid;
+
+            if (kind === 'activation') {
+                return activated ? res.redirect('/app') : sendView(res, 'activation.html');
+            }
+
+            if (kind === 'admin') {
+                return admin ? res.redirect('/app#/admin') : res.redirect(activated ? '/app' : '/activation');
+            }
+
+            if (!activated) return res.redirect('/activation');
+
+            return sendView(res, 'app.html');
+        } catch (error) {
+            next(error);
+        }
+    };
+}
+
+app.get('/app', gate('app'));
+app.get('/admin', gate('admin'));
+app.get('/activation', gate('activation'));
 
 app.use(express.static(path.join(__dirname, 'public'), {
     extensions: ['html'],

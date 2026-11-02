@@ -5,6 +5,7 @@
     var me = null;
     var tasksFilter = 'all';
     var adminTab = 'overview';
+    var memberFilter = '';
     var countdowns = {};
 
     // ---------- helpers ----------
@@ -18,7 +19,7 @@
     function kes(cents) {
         var n = (Number(cents) || 0) / 100;
 
-        return 'KES ' + n.toLocaleString('en-KE', { maximumFractionDigits: 2 });
+        return 'KSh ' + n.toLocaleString('en-KE', { maximumFractionDigits: 2 });
     }
 
     function when(value) {
@@ -43,6 +44,12 @@
         if (response.status === 401) {
             location.href = '/auth';
             throw new Error('Please log in.');
+        }
+
+        // Server says this account still needs the activation payment.
+        if (response.status === 402) {
+            location.href = data.redirect || '/activation';
+            throw new Error('Activate your account to continue.');
         }
 
         if (!response.ok) throw new Error(data.error || 'Something went wrong.');
@@ -94,7 +101,13 @@
         processing: 'Processing',
         paid: 'Paid',
         rejected: 'Rejected',
-        failed: 'Failed'
+        failed: 'Failed',
+        initiating: 'Starting',
+        verifying: 'Confirming',
+        cancelled: 'Cancelled',
+        timeout: 'Timed out',
+        review: 'Needs review',
+        unknown: 'Unknown'
     };
 
     function statusBadge(status) {
@@ -192,6 +205,11 @@
         var s = me.stats;
 
         var html = header('Hello, ' + me.user.fullName.split(' ')[0], 'Here is your account at a glance.');
+
+        html += '<div class="alert alert-ok small">Account status: <strong>' +
+            (me.user.isAdmin ? 'Administrator' : 'Activated') + '</strong>' +
+            (me.user.activationPaidAt && !me.user.isAdmin ? ' · since ' + esc(when(me.user.activationPaidAt)) : '') +
+            ' · ' + esc(me.user.email) + ' · ' + esc(me.user.phone) + '</div>';
 
         if (cfg.announcement) {
             html += '<div class="alert alert-info">' + esc(cfg.announcement) + '</div>';
@@ -482,7 +500,7 @@
     // ---------- admin ----------
 
     var ADMIN_TABS = [
-        ['overview', 'Overview'], ['withdrawals', 'Withdrawals'], ['tasks', 'Tasks'],
+        ['overview', 'Overview'], ['payments', 'Activations'], ['withdrawals', 'Withdrawals'], ['tasks', 'Tasks'],
         ['members', 'Members'], ['settings', 'Settings'], ['log', 'Log']
     ];
 
@@ -503,6 +521,7 @@
 
         try {
             if (adminTab === 'overview') await adminOverview(body);
+            else if (adminTab === 'payments') await adminPayments(body);
             else if (adminTab === 'withdrawals') await adminWithdrawals(body);
             else if (adminTab === 'tasks') await adminTasks(body);
             else if (adminTab === 'members') await adminMembers(body, '');
@@ -519,6 +538,7 @@
         body.innerHTML = '<div class="stats">' +
             '<div class="stat"><span>Members</span><strong>' + o.users.total + '</strong></div>' +
             '<div class="stat"><span>Verified</span><strong>' + o.users.verified + '</strong></div>' +
+            '<div class="stat"><span>Activated</span><strong>' + o.users.activated + '</strong></div>' +
             '<div class="stat"><span>Tasks completed</span><strong>' + o.completedTasks + '</strong></div>' +
             '<div class="stat"><span>Open withdrawals</span><strong>' + o.openWithdrawals.n + '</strong></div>' +
             '<div class="stat"><span>Open withdrawal value</span><strong>' + kes(o.openWithdrawals.total) + '</strong></div>' +
@@ -528,6 +548,19 @@
                 ? '<div class="alert alert-ok">Connected (' + esc(o.mpesaEnv) + '). Approved withdrawals are sent to M-Pesa and shown as paid only after Safaricom confirms.</div>'
                 : '<div class="alert alert-warn">Automatic M-Pesa payouts are not configured. Approved withdrawals must be paid manually, then confirmed here with the M-Pesa receipt code.</div>') +
             '</div>';
+    }
+
+    async function adminPayments(body) {
+        var data = await api('/api/admin/activations');
+
+        body.innerHTML = '<section class="card"><h3>Activation payments</h3>' +
+            (data.payments.length ? '<div class="table-wrap"><table><thead><tr><th>#</th><th>Member</th><th>Amount</th><th>Phone</th><th>Status</th><th>M-Pesa receipt</th><th>Date</th></tr></thead><tbody>' +
+            data.payments.map(function (p) {
+                return '<tr><td>' + p.id + '</td><td>' + esc(p.username) + '<div class="small muted">' + esc(p.email) + '</div></td>' +
+                    '<td class="amt">' + kes(p.amount) + '</td><td class="nowrap">' + esc(p.phone) + '</td><td>' + statusBadge(p.status) +
+                    (p.result_description ? '<div class="small muted">' + esc(p.result_description) + '</div>' : '') + '</td>' +
+                    '<td class="nowrap">' + esc(p.mpesa_receipt || '—') + '</td><td class="nowrap small">' + esc(when(p.paid_at || p.created_at)) + '</td></tr>';
+            }).join('') + '</tbody></table></div>' : empty('💳', 'No activation payments yet.')) + '</section>';
     }
 
     async function adminWithdrawals(body) {
@@ -600,14 +633,17 @@
     }
 
     async function adminMembers(body, q) {
-        var data = await api('/api/admin/users?q=' + encodeURIComponent(q));
+        var data = await api('/api/admin/users?q=' + encodeURIComponent(q) + '&filter=' + encodeURIComponent(memberFilter));
+        var filterBar = '<div class="sub-tabs">' + [['', 'All'], ['verified', 'Verified'], ['unverified', 'Unverified'], ['activated', 'Activated'], ['unactivated', 'Not activated']].map(function (f) {
+            return '<button data-action="member-filter" data-value="' + f[0] + '" class="' + (memberFilter === f[0] ? 'selected' : '') + '">' + f[1] + '</button>';
+        }).join('') + '</div>';
 
-        var html = '<section class="card"><form id="memberSearch" class="copy-row" novalidate>' +
+        var html = filterBar + '<section class="card"><form id="memberSearch" class="copy-row" novalidate>' +
             '<input name="q" placeholder="Search name, username, email or phone" value="' + esc(q) + '"><button class="btn btn-primary" type="submit">Search</button></form></section>' +
             '<section class="card"><div class="table-wrap"><table><thead><tr><th>Member</th><th>Phone</th><th>Balance</th><th>Status</th><th></th></tr></thead><tbody>' +
             data.users.map(function (u) {
                 return '<tr><td>' + esc(u.username) + (u.is_admin ? ' <span class="badge">admin</span>' : '') + '<div class="small muted">' + esc(u.email) +
-                    (u.verified ? '' : ' · unverified') + '</div></td><td class="nowrap">' + esc(u.phone) + '</td><td class="amt">' + kes(u.balance) + '</td><td>' +
+                    (u.verified ? '' : ' · unverified') + (u.is_admin ? '' : (u.activation_paid ? ' · activated' : ' · not activated')) + '</div></td><td class="nowrap">' + esc(u.phone) + '</td><td class="amt">' + kes(u.balance) + '</td><td>' +
                     (u.status === 'active' ? '<span class="badge done">Active</span>' : '<span class="badge failed">Suspended</span>') + '</td><td><div class="actions">' +
                     '<button class="btn btn-outline btn-sm" data-action="user-adjust" data-id="' + esc(u.id) + '">Adjust</button>' +
                     '<button class="btn btn-outline btn-sm" data-action="user-status" data-id="' + esc(u.id) + '" data-status="' + (u.status === 'active' ? 'suspended' : 'active') + '">' +
@@ -739,6 +775,14 @@
                 await api('/api/logout', 'POST', {});
                 location.href = '/';
             });
+            return;
+        }
+
+        if (action === 'member-filter') {
+            memberFilter = el.dataset.value;
+            var mb = document.getElementById('adminBody');
+            var qi = document.querySelector('#memberSearch [name="q"]');
+            adminMembers(mb, qi ? qi.value : '').catch(failure);
             return;
         }
 

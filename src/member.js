@@ -6,12 +6,13 @@ const bcrypt = require('bcryptjs');
 
 const { pool, withTx, getSettings, balanceOf } = require('./db');
 const {
-    requireAuth, normalizePhone, maskName, toCents, safeEqual
+    requireAuth, requireActivated, normalizePhone, maskName, toCents, safeEqual
 } = require('./util');
 
 const router = express.Router();
 
-router.use(requireAuth);
+// Every member route needs a verified email AND a paid activation (or admin).
+router.use(requireAuth, requireActivated);
 
 // Start of "today" in Kenya time, used for daily limits.
 const TODAY_START =

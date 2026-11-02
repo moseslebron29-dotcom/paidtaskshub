@@ -34,7 +34,28 @@ Remove the old `DEMO_MODE` variable. It is no longer used.
 3. In **Admin → Settings** set rewards you can actually afford to pay (they default to 0, so nothing pays out until you choose). Set support email/phone.
 4. In **Admin → Tasks** add video/ad tasks.
 
-## 4. Withdrawals
+## 4. Account activation (KSh 150, M-Pesa STK Push)
+
+Flow: register → email code → `/activation` → Pay → PIN on phone → Safaricom callback → account active → `/app`.
+
+| Name | Value |
+|---|---|
+| `ACTIVATION_FEE` | `150` |
+| `MPESA_ENV` | `sandbox` or `production` |
+| `MPESA_CONSUMER_KEY` / `MPESA_CONSUMER_SECRET` | from your Daraja app |
+| `MPESA_PASSKEY` | Lipa na M-Pesa Online passkey |
+| `MPESA_SHORTCODE` | your paybill (sandbox: `174379`) |
+| `MPESA_CALLBACK_URL` | `https://<your-render-url>/api/mpesa/stk/callback?token=<MPESA_STK_CALLBACK_TOKEN>` |
+| `MPESA_STK_CALLBACK_TOKEN` | long random text; must match the `token=` in the URL |
+| `MPESA_TRANSACTION_TYPE` / `MPESA_PARTYB` | optional, for a Buy Goods till |
+
+Security: an account is activated only when Safaricom's callback reports success, the amount equals the fee, the phone matches, the receipt is new, AND a server-side STK Query to Daraja confirms it. Cancelled / timed-out / failed payments can be retried. Admin (`moseslebron29@gmail.com` + `ADMIN_EMAILS`) never pays.
+
+Access rules are enforced on the server: not logged in → `/auth`; unverified → `/auth`; unpaid → `/activation` (APIs return 402); admin → `/admin`.
+
+Without M-Pesa keys the activation page shows "not set up yet". For local testing only, `ACTIVATION_DEV_MODE=true` (ignored when `NODE_ENV=production`).
+
+## 5. Withdrawals
 
 - Members request a withdrawal. The amount is held in their ledger immediately.
 - **Admin → Withdrawals**: Approve or Reject (reject returns the money).
@@ -44,7 +65,7 @@ Remove the old `DEMO_MODE` variable. It is no longer used.
 Optional M-Pesa variables (all required together): `MPESA_ENV` (`sandbox` or `production`), `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_SHORTCODE`, `MPESA_INITIATOR_NAME`, `MPESA_INITIATOR_PASSWORD`, `MPESA_CERT_PEM` (Safaricom public certificate, newlines as `\n`), `MPESA_CALLBACK_SECRET` (long random text), `PUBLIC_BASE_URL` (your Render URL, e.g. `https://paidtaskshub-tkql.onrender.com`).
 Test in the sandbox first. Production needs Safaricom approval.
 
-## 5. Existing accounts
+## 6. Existing accounts
 
 If `data/users.json` from the old version still exists when the app starts, its accounts are imported with their password hashes unchanged. Accounts that only lived on Render's wiped disk cannot be recovered; those members must register again.
 

@@ -79,6 +79,27 @@ async function requireAuth(req, res, next) {
     }
 }
 
+// The admin is identified on the server only: the is_admin flag is set by the
+// database migration from ADMIN_EMAIL / ADMIN_EMAILS and can never be changed
+// by a member request.
+function isAdminUser(user) {
+    return !!(user && user.verified && user.is_admin);
+}
+
+// Members must verify their email (requireAuth) AND pay the activation fee
+// before they may use tasks, wallet, withdrawals or referrals. Admins bypass.
+function requireActivated(req, res, next) {
+    if (isAdminUser(req.user) || (req.user && req.user.activation_paid)) {
+        return next();
+    }
+
+    return res.status(402).json({
+        error: 'Activate your account to continue.',
+        code: 'ACTIVATION_REQUIRED',
+        redirect: '/activation'
+    });
+}
+
 function requireAdmin(req, res, next) {
     if (!req.user || !req.user.is_admin) {
         return res.status(403).json({ error: 'Admin access required.' });
@@ -107,5 +128,7 @@ module.exports = {
     toCents,
     requireAuth,
     requireAdmin,
+    requireActivated,
+    isAdminUser,
     requireJson
 };

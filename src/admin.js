@@ -15,7 +15,9 @@ router.get('/admin/overview', async (req, res) => {
     try {
         const [users, wd, liability, tasks] = await Promise.all([
             pool.query(`SELECT COUNT(*)::int AS total,
-                        COUNT(*) FILTER (WHERE verified)::int AS verified FROM users`),
+                        COUNT(*) FILTER (WHERE verified)::int AS verified,
+                        COUNT(*) FILTER (WHERE verified AND (activation_paid OR is_admin))::int AS activated
+                        FROM users`),
             pool.query(`SELECT COUNT(*)::int AS n, COALESCE(SUM(amount),0)::bigint AS total
                         FROM withdrawals WHERE status IN ('pending','approved','processing')`),
             pool.query(`SELECT COALESCE(SUM(amount),0)::bigint AS total FROM ledger`),
@@ -41,13 +43,21 @@ router.get('/admin/overview', async (req, res) => {
 router.get('/admin/users', async (req, res) => {
     try {
         const q = '%' + String(req.query.q || '').trim() + '%';
+        const filters = {
+            verified: 'AND u.verified',
+            unverified: 'AND NOT u.verified',
+            activated: 'AND (u.activation_paid OR u.is_admin)',
+            unactivated: 'AND u.verified AND NOT u.activation_paid AND NOT u.is_admin'
+        };
+        const extra = filters[String(req.query.filter || '')] || '';
 
         const { rows } = await pool.query(
             `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.verified,
-                    u.status, u.is_admin, u.created_at,
+                    u.status, u.is_admin, u.created_at, u.activation_paid, u.activation_paid_at,
                     (SELECT COALESCE(SUM(amount),0)::bigint FROM ledger l WHERE l.user_id = u.id) AS balance
              FROM users u
-             WHERE u.username ILIKE $1 OR u.email ILIKE $1 OR u.full_name ILIKE $1 OR u.phone ILIKE $1
+             WHERE (u.username ILIKE $1 OR u.email ILIKE $1 OR u.full_name ILIKE $1 OR u.phone ILIKE $1)
+             ${extra}
              ORDER BY u.created_at DESC LIMIT 100`,
             [q]
         );
@@ -56,6 +66,37 @@ router.get('/admin/users', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Could not load members.' });
+    }
+});
+
+// ---------- ACTIVATION PAYMENTS ----------
+
+router.get('/admin/activations', async (req, res) => {
+    try {
+        const status = String(req.query.status || 'all');
+        const allowed = ['initiating', 'processing', 'verifying', 'paid', 'failed', 'cancelled', 'timeout', 'review', 'unknown'];
+        const params = [];
+        let where = '';
+
+        if (allowed.includes(status)) {
+            params.push(status);
+            where = 'WHERE p.status = $1';
+        }
+
+        const { rows } = await pool.query(
+            `SELECT p.id, p.amount, p.phone, p.status, p.mpesa_receipt,
+                    p.checkout_request_id, p.result_description,
+                    p.created_at, p.paid_at, u.username, u.email
+             FROM activation_payments p JOIN users u ON u.id = p.user_id
+             ${where}
+             ORDER BY p.id DESC LIMIT 200`,
+            params
+        );
+
+        res.json({ payments: rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Could not load activation payments.' });
     }
 });
 

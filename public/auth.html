@@ -79,6 +79,8 @@
     margin: 0 0 14px;
 }
 
+.pth-ad-continue { grid-column: 1 / -1; }
+
 .pth-ad-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -129,7 +131,7 @@
     }
 }
 </style></head><body><!-- REGISTRATION ADVERTISEMENT --><div class="pth-ad-overlay" id="pthRegistrationAd"
-     aria-label="Advertisement" aria-modal="true" role="dialog"><div class="pth-ad-card">
+     aria-label="Advertisement" aria-modal="true" aria-hidden="true" role="dialog"><div class="pth-ad-card">
 
     <div class="pth-ad-top">
         <span class="pth-ad-brand">PaidTasksHub</span>
@@ -142,11 +144,11 @@
            autoplay muted playsinline preload="auto" controls>
     </video>
 
-    <h2 class="pth-ad-title">Sponsored video</h2>
+    <h2 class="pth-ad-title">A short video before you join</h2>
 
     <p class="pth-ad-copy">
-        Watch this advertisement before continuing
-        to create your PaidTasksHub account.
+        This is an advertisement. Watch it, or exit at any time,
+        then continue to create your PaidTasksHub account.
     </p>
 
     <div class="pth-ad-actions">
@@ -154,7 +156,12 @@
         <button class="pth-ad-btn pth-ad-continue"
                 id="pthAdContinue"
                 type="button" disabled>
-            Continue after advert
+            Continue after video
+        </button>
+
+        <button class="pth-ad-btn pth-ad-exit"
+                id="pthAdFullscreen" type="button">
+            ⛶ Fullscreen
         </button>
 
         <button class="pth-ad-btn pth-ad-exit"
@@ -163,6 +170,8 @@
         </button>
 
     </div>
+
+    <p class="pth-ad-note" id="pthAdStatus" aria-live="polite"></p>
 
     <p class="pth-ad-note">
         You can exit the advertisement at any time.
@@ -398,63 +407,5 @@
 
 </main>
 
-</div><!-- ADVERTISEMENT SCRIPT --><script>
-(function () {
-
-    var params = new URLSearchParams(window.location.search);
-
-    var isRegistrationEntry =
-        params.get('tab') === 'register' ||
-        params.has('ref');
-
-    if (!isRegistrationEntry) return;
-
-    var overlay = document.getElementById('pthRegistrationAd');
-    var video = document.getElementById('pthAdVideo');
-    var exit = document.getElementById('pthAdExit');
-    var proceed = document.getElementById('pthAdContinue');
-
-    var closed = false;
-
-    function closeAd() {
-
-        if (closed) return;
-
-        closed = true;
-
-        overlay.classList.remove('is-visible');
-        overlay.setAttribute('aria-hidden', 'true');
-
-        video.pause();
-    }
-
-    overlay.classList.add('is-visible');
-    overlay.setAttribute('aria-hidden', 'false');
-
-    exit.addEventListener('click', closeAd);
-    proceed.addEventListener('click', closeAd);
-
-    video.addEventListener('ended', function () {
-
-        proceed.disabled = false;
-        proceed.textContent = 'Continue to Registration';
-
-    });
-
-    video.addEventListener('error', function () {
-
-        proceed.disabled = false;
-        proceed.textContent = 'Continue to Registration';
-
-    });
-
-    video.play().catch(function () {
-
-        proceed.disabled = false;
-        proceed.textContent = 'Continue to Registration';
-
-    });
-
-})();
-</script><!-- ORIGINAL AUTHENTICATION JAVASCRIPT --><script src="/js/auth.js"></script></body>
+</div><!-- ADVERTISEMENT SCRIPT (external file: inline scripts are blocked by the security policy) --><script src="/js/ad.js"></script><!-- ORIGINAL AUTHENTICATION JAVASCRIPT --><script src="/js/auth.js"></script></body>
                     </html>

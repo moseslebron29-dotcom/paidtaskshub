@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Activate your account – PaidTasksHub</title>
+<meta name="theme-color" content="#0b1b34">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="act-body">
+<header class="site-header">
+    <div class="container nav">
+        <a class="brand" href="/"><span class="brand-mark">P</span><span>PaidTasks<b>Hub</b></span></a>
+        <div class="nav-cta">
+            <button class="btn btn-ghost-light btn-sm" id="actLogout" type="button">Log out</button>
+        </div>
+    </div>
+</header>
+
+<main class="act-wrap">
+    <section class="act-card">
+        <div class="act-steps" aria-label="Progress">
+            <span class="act-step done">1 · Account</span>
+            <span class="act-step done">2 · Email verified</span>
+            <span class="act-step current">3 · Activate</span>
+        </div>
+
+        <h1 class="act-title">Activate your account</h1>
+        <p class="muted">A one-time activation fee unlocks tasks, your wallet and withdrawals.</p>
+
+        <div class="act-fee">
+            <span class="act-fee-label">One-time activation fee</span>
+            <strong class="act-fee-amount" id="actFee">KSh 150</strong>
+            <span class="act-fee-note">Paid securely via M-Pesa STK Push</span>
+        </div>
+
+        <div id="actMessage" class="alert hidden" role="status" aria-live="polite"></div>
+
+        <form id="actForm" novalidate>
+            <p class="small muted" style="margin-bottom:6px">Registered phone: <strong id="actRegPhone">…</strong></p>
+            <label for="actPhone">Safaricom M-Pesa number</label>
+            <input id="actPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
+                   placeholder="07XXXXXXXX" required>
+            <p class="hint">You can change this if you want to pay from another Safaricom line.</p>
+
+            <button class="btn btn-primary btn-block act-pay" id="actPay" type="submit">Pay KSh 150</button>
+        </form>
+
+        <div id="actWaiting" class="act-waiting hidden">
+            <div class="spinner" role="status" aria-label="Waiting for payment"></div>
+            <p><strong>Check your phone.</strong> Enter your M-Pesa PIN on the prompt to complete payment.</p>
+            <p class="small muted">This page updates automatically once M-Pesa confirms.</p>
+        </div>
+
+        <ul class="act-points">
+            <li>Your PIN is entered only on your phone — we never see or store it.</li>
+            <li>Your account is activated only after M-Pesa confirms the payment to our server.</li>
+            <li>If the payment fails or you cancel, you can try again.</li>
+        </ul>
+
+        <p class="small muted center">Need help? See our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</p>
+    </section>
+</main>
+
+<script src="/js/activation.js"></script>
+</body>
+</html>

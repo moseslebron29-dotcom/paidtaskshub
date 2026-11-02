@@ -369,6 +369,16 @@ async function importLegacyUsers() {
 async function migrate() {
     await pool.query(SCHEMA);
 
+    // One paid activation per account (safe if it already exists).
+    try {
+        await pool.query(
+            `CREATE UNIQUE INDEX IF NOT EXISTS activation_one_paid_uq
+             ON activation_payments (user_id) WHERE status = 'paid'`
+        );
+    } catch (error) {
+        console.warn('Could not add activation_one_paid_uq (duplicate paid rows exist):', error.message);
+    }
+
     const { rows } = await pool.query(
         'SELECT id FROM users WHERE referral_code IS NULL'
     );

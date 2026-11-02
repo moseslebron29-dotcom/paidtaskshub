@@ -226,11 +226,15 @@
         showForm('registerForm');
     }
 
+    if (params.get('verify')) {
+        show('Please verify your email first. Enter your email and use Resend verification code.', 'info');
+    }
+
     // Already logged in? Go straight to dashboard.
     fetch('/api/session', { credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (s) {
-            if (s.loggedIn) location.replace('/app');
+            if (s.loggedIn) location.replace(s.next || '/app');
         })
         .catch(function () {});
 })();

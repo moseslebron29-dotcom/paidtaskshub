@@ -67,7 +67,10 @@ function publicUser(user) {
         email: user.email,
         phone: user.phone,
         active: user.active,
-        isAdmin: user.is_admin,
+        verified: user.verified,
+        isAdmin: !!(user.verified && user.is_admin),
+        activated: !!(user.verified && (user.is_admin || user.activation_paid)),
+        activationPaidAt: user.activation_paid_at,
         referralCode: user.referral_code,
         createdAt: user.created_at
     };
@@ -407,8 +410,35 @@ router.post('/login', limiter(15, 15), async (req, res) => {
 });
 
 // SESSION CHECK
-router.get('/session', (req, res) => {
-    res.json({ loggedIn: !!(req.session && req.session.userId) });
+router.get('/session', async (req, res) => {
+    if (!req.session || !req.session.userId) {
+        return res.json({ loggedIn: false });
+    }
+
+    try {
+        const { rows } = await pool.query(
+            'SELECT verified, is_admin, activation_paid, status FROM users WHERE id = $1',
+            [req.session.userId]
+        );
+        const u = rows[0];
+
+        if (!u || !u.verified || u.status !== 'active') {
+            return res.json({ loggedIn: false });
+        }
+
+        const admin = !!u.is_admin;
+        const activated = admin || !!u.activation_paid;
+
+        res.json({
+            loggedIn: true,
+            isAdmin: admin,
+            activated,
+            next: activated ? '/app' : '/activation'
+        });
+    } catch (error) {
+        console.error(error);
+        res.json({ loggedIn: false });
+    }
 });
 
 // CURRENT USER
