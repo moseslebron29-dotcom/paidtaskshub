@@ -12,6 +12,7 @@ const { requireJson, toCents } = require('./src/util');
 const authRoutes = require('./src/auth');
 const adminRoutes = require('./src/admin');
 const memberRoutes = require('./src/member');
+const recommendationRoutes = require('./src/recommendations');
 const mpesa = require('./src/mpesa');
 
 const app = express();
@@ -102,6 +103,7 @@ app.use('/api', requireJson);
 app.use('/api', authRoutes);
 app.use('/api', mpesa.router);
 app.use('/api', adminRoutes);
+app.use('/api', recommendationRoutes);
 app.use('/api', memberRoutes);
 
 app.use('/api', (req, res) => {

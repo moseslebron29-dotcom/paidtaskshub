@@ -7,6 +7,7 @@
     var adminTab = 'overview';
     var memberFilter = '';
     var countdowns = {};
+    var matchingRequest = null;
 
     // ---------- helpers ----------
 
@@ -47,7 +48,7 @@
         }
 
         // Server says this account still needs the activation payment.
-        if (response.status === 402) {
+        if (response.status === 402 && data.code === 'ACTIVATION_REQUIRED') {
             location.href = data.redirect || '/activation';
             throw new Error('Activate your account to continue.');
         }
@@ -167,6 +168,7 @@
 
     async function route() {
         var name = currentRoute();
+        if (matchingRequest) matchingRequest.abort();
 
         Object.keys(countdowns).forEach(function (k) { clearInterval(countdowns[k]); });
         countdowns = {};
@@ -265,6 +267,8 @@
 
         var html = header('Available tasks', 'Finish a task to earn its listed reward. Each task can be completed once.');
 
+        html += matchingForm();
+
         html += '<div class="filters" role="tablist">' +
             [['all', 'All'], ['maths', 'Maths'], ['video', 'Videos'], ['ad', 'Ads']].map(function (f) {
                 return '<button data-action="filter" data-value="' + f[0] + '" class="' + (tasksFilter === f[0] ? 'selected' : '') + '">' + f[1] + '</button>';
@@ -301,6 +305,86 @@
         view.innerHTML = html;
 
         if (document.getElementById('mathSlot')) await loadMath();
+    }
+
+    function matchingForm() {
+        return '<section aria-labelledby="matchingTitle"><h3 id="matchingTitle">Find tasks for you</h3>' +
+            '<form id="matchingForm"><label>Skills<textarea name="skills" rows="3" maxlength="2000" placeholder="Writing, social media, research…"></textarea></label>' +
+            '<label>Interests<textarea name="interests" rows="3" maxlength="2000" placeholder="Technology, sports, music…"></textarea></label>' +
+            '<div class="actions"><button type="submit" class="btn btn-primary">Find matches</button>' +
+            '<button type="button" class="btn btn-outline hidden" id="stopMatching" data-action="stop-matching">Stop</button></div></form>' +
+            '<div id="matchingStatus" role="status"></div><details id="matchingThinking" class="hidden"><summary>AI reasoning</summary><p id="matchingReasoning"></p></details>' +
+            '<div id="matchingResults"></div></section>';
+    }
+
+    async function findMatches(form) {
+        var status = document.getElementById('matchingStatus');
+        var results = document.getElementById('matchingResults');
+        var stop = document.getElementById('stopMatching');
+        var button = form.querySelector('button[type="submit"]');
+        var controller = new AbortController();
+        matchingRequest = controller;
+        button.disabled = true;
+        stop.classList.remove('hidden');
+        results.innerHTML = '';
+        document.getElementById('matchingReasoning').textContent = '';
+        document.getElementById('matchingThinking').classList.add('hidden');
+        status.textContent = 'Matching your skills and interests…';
+        function showMatches(data) {
+            status.textContent = data.message || 'Your matches';
+            results.innerHTML = (data.recommendations || []).map(function (match) {
+                return '<p class="muted">' + esc(match.reason) + '</p>' + taskRow(match.task);
+            }).join('');
+        }
+        function event(data) {
+            if (data.type === 'error') {
+                if (data.status === 401) location.href = '/auth';
+                throw new Error(data.message);
+            }
+            if (data.type === 'reasoning') {
+                document.getElementById('matchingThinking').classList.remove('hidden');
+                document.getElementById('matchingReasoning').textContent += data.text;
+            }
+            if (data.type === 'result') showMatches(data);
+        }
+        try {
+            var response = await fetch('/api/recommendations', {
+                method: 'POST', credentials: 'same-origin', signal: controller.signal,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skills: form.elements.skills.value, interests: form.elements.interests.value })
+            });
+            if (!response.ok) {
+                var error = await response.json();
+                if (response.status === 401) location.href = '/auth';
+                if (error.code === 'ACTIVATION_REQUIRED') location.href = '/activation';
+                if (error.paused && me.user.isAdmin) {
+                    results.innerHTML = '<button class="btn btn-outline" data-action="resume-matching">Resume AI matching</button>';
+                }
+                throw new Error(error.error || 'Task matching failed.');
+            }
+            if ((response.headers.get('content-type') || '').indexOf('application/x-ndjson') === -1) {
+                showMatches(await response.json());
+                return;
+            }
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            var pending = '';
+            while (true) {
+                var chunk = await reader.read();
+                pending += decoder.decode(chunk.value, { stream: !chunk.done });
+                var lines = pending.split('\n');
+                pending = lines.pop();
+                lines.forEach(function (line) { if (line.trim()) event(JSON.parse(line)); });
+                if (chunk.done) break;
+            }
+            if (pending.trim()) event(JSON.parse(pending));
+        } catch (error) {
+            status.textContent = controller.signal.aborted ? 'Matching stopped.' : error.message;
+        } finally {
+            button.disabled = false;
+            stop.classList.add('hidden');
+            if (matchingRequest === controller) matchingRequest = null;
+        }
     }
 
     function taskRow(t) {
@@ -721,6 +805,16 @@
         var action = el.dataset.action;
         var id = el.dataset.id;
 
+        if (action === 'stop-matching') { if (matchingRequest) matchingRequest.abort(); return; }
+        if (action === 'resume-matching') {
+            run(el, async function () {
+                var result = await api('/api/recommendations/resume', 'POST', {});
+                toast(result.message);
+                el.remove();
+            });
+            return;
+        }
+
         if (action === 'reload') { route(); return; }
 
         if (action === 'filter') {
@@ -882,7 +976,9 @@
             return d;
         }
 
-        if (form.id === 'mathForm') {
+        if (form.id === 'matchingForm') {
+            findMatches(form);
+        } else if (form.id === 'mathForm') {
             run(button, async function () {
                 var r = await api('/api/math/answer', 'POST', { id: form.dataset.id, answer: data().answer });
 

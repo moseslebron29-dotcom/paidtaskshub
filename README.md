@@ -75,3 +75,13 @@ If `data/users.json` from the old version still exists when the app starts, its 
 - Login, registration and OTP routes are rate-limited; OTP codes are hashed and expire in 5 minutes.
 - Rewards are credited by the server only, once per task (database-enforced). Wallet balance is the sum of ledger rows.
 - Never commit `.env` files or API keys.
+
+## AI task matching
+
+Members open Tasks, enter skills and/or interests, and choose Find matches. Only active, unfinished tasks with remaining capacity are eligible. Availability is checked again after generation. Existing task-start and reward checks remain unchanged. No profile data is stored and no fake tasks are created.
+
+Set `LOVABLE_API_KEY` as a private environment variable in Render, then redeploy with `npm install` and `npm start`. The key must never be included in browser code. Matching uses the Lovable AI Gateway Responses endpoint with `openai/gpt-6-astra`; usage consumes workspace AI credits. Requests run only after a member clicks Find matches. Stop cancels the request. There are no automatic retries or scheduled requests.
+
+AI access/credit blocks are saved in the existing settings table and survive restarts. After restoring access or credits, an administrator can choose Resume AI matching from the task matching error state. This only clears the block; a new explicit member request checks availability. No database migration is needed.
+
+Tests: `node --test test/task-matching.test.cjs`. Live account testing requires an activated member session and available tasks; real AI access must be verified after Render configuration.
