@@ -1,87 +1,822 @@
-# PaidTasksHub
+# Earn By Doing Hub
 
-Tasks, referrals and M-Pesa withdrawals. Node.js 20+, Express, Postgres.
+PROJECT: UPGRADE EXISTING PAIDTASKHUB
 
-## 1. Free database (needed once)
 
-Render's free disk is wiped on every deploy, so accounts must live in a database.
 
-1. Go to https://neon.tech and create a free account and project.
-2. Copy the **connection string** (starts with `postgresql://`).
+I want you to upgrade my existing PaidTaskHub website into a professional, fully functional online task-earning platform.
 
-## 2. Render environment variables
 
-Render dashboard → your service → **Environment**:
 
-| Name | Value |
-|---|---|
-| `DATABASE_URL` | the Neon connection string (required) |
-| `SESSION_SECRET` | any long random text, 40+ characters (required) |
-| `NODE_ENV` | `production` |
-| `ADMIN_EMAILS` | your email (comma-separate several). That account becomes admin. |
-| `BREVO_API_KEY` | your Brevo API key (same as before) |
-| `BREVO_SENDER_EMAIL` | your verified Brevo sender (same as before) |
-| `BREVO_SENDER_NAME` | `PaidTasksHub` |
+REFERENCE WEBSITE:
 
-Build command: `npm install` Start command: `npm start` Health check path: `/health`
+https://lipatask.com
 
-Remove the old `DEMO_MODE` variable. It is no longer used.
 
-## 3. First run
 
-1. Deploy. The tables are created automatically.
-2. Register with the email you put in `ADMIN_EMAILS`, verify it, log in. You will see **Admin** in the menu.
-3. In **Admin → Settings** set rewards you can actually afford to pay (they default to 0, so nothing pays out until you choose). Set support email/phone.
-4. In **Admin → Tasks** add video/ad tasks.
+IMPORTANT:
 
-## 4. Account activation (KSh 150, M-Pesa STK Push)
+Do not create a completely new website. Work directly on my uploaded existing project files. Preserve the current PaidTaskHub branding, logo, colours, layout, design identity and existing working features.
 
-Flow: register → email code → `/activation` → Pay → PIN on phone → Safaricom callback → account active → `/app`.
 
-| Name | Value |
-|---|---|
-| `ACTIVATION_FEE` | `150` |
-| `MPESA_ENV` | `sandbox` or `production` |
-| `MPESA_CONSUMER_KEY` / `MPESA_CONSUMER_SECRET` | from your Daraja app |
-| `MPESA_PASSKEY` | Lipa na M-Pesa Online passkey |
-| `MPESA_SHORTCODE` | your paybill (sandbox: `174379`) |
-| `MPESA_CALLBACK_URL` | `https://<your-render-url>/api/mpesa/stk/callback?token=<MPESA_STK_CALLBACK_TOKEN>` |
-| `MPESA_STK_CALLBACK_TOKEN` | long random text; must match the `token=` in the URL |
-| `MPESA_TRANSACTION_TYPE` / `MPESA_PARTYB` | optional, for a Buy Goods till |
 
-Security: an account is activated only when Safaricom's callback reports success, the amount equals the fee, the phone matches, the receipt is new, AND a server-side STK Query to Daraja confirms it. Cancelled / timed-out / failed payments can be retried. Admin (`moseslebron29@gmail.com` + `ADMIN_EMAILS`) never pays.
+Use LipaTask as a functional reference for its publicly visible task categories, task descriptions, advertised rewards, durations and user experience. Do not copy its branding, proprietary assets or impersonate its business.
 
-Access rules are enforced on the server: not logged in → `/auth`; unverified → `/auth`; unpaid → `/activation` (APIs return 402); admin → `/admin`.
 
-Without M-Pesa keys the activation page shows "not set up yet". For local testing only, `ACTIVATION_DEV_MODE=true` (ignored when `NODE_ENV=production`).
 
-## 5. Withdrawals
+The goal is to make PaidTaskHub more professional, feature-rich, attractive and easy to use.
 
-- Members request a withdrawal. The amount is held in their ledger immediately.
-- **Admin → Withdrawals**: Approve or Reject (reject returns the money).
-- Without M-Pesa API keys: after approving, pay the member from your own M-Pesa, then press **Mark paid** and enter the receipt code from the confirmation SMS.
-- With M-Pesa API keys (Daraja B2C): approving sends the payout, and the status becomes **Paid** only when Safaricom's callback confirms it.
 
-Optional M-Pesa variables (all required together): `MPESA_ENV` (`sandbox` or `production`), `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_SHORTCODE`, `MPESA_INITIATOR_NAME`, `MPESA_INITIATOR_PASSWORD`, `MPESA_CERT_PEM` (Safaricom public certificate, newlines as `\n`), `MPESA_CALLBACK_SECRET` (long random text), `PUBLIC_BASE_URL` (your Render URL, e.g. `https://paidtaskshub-tkql.onrender.com`).
-Test in the sandbox first. Production needs Safaricom approval.
 
-## 6. Existing accounts
+==================================================
 
-If `data/users.json` from the old version still exists when the app starts, its accounts are imported with their password hashes unchanged. Accounts that only lived on Render's wiped disk cannot be recovered; those members must register again.
 
-## Security notes
 
-- Sessions are stored in Postgres, cookies are HttpOnly + Secure + SameSite.
-- Login, registration and OTP routes are rate-limited; OTP codes are hashed and expire in 5 minutes.
-- Rewards are credited by the server only, once per task (database-enforced). Wallet balance is the sum of ledger rows.
-- Never commit `.env` files or API keys.
+1. PUBLIC TASK DASHBOARD
 
-## AI task matching
+   ==================================================
 
-Members open Tasks, enter skills and/or interests, and choose Find matches. Only active, unfinished tasks with remaining capacity are eligible. Availability is checked again after generation. Existing task-start and reward checks remain unchanged. No profile data is stored and no fake tasks are created.
 
-Set `LOVABLE_API_KEY` as a private environment variable in Render, then redeploy with `npm install` and `npm start`. The key must never be included in browser code. Matching uses the Lovable AI Gateway Responses endpoint with `openai/gpt-6-astra`; usage consumes workspace AI credits. Requests run only after a member clicks Find matches. Stop cancels the request. There are no automatic retries or scheduled requests.
 
-AI access/credit blocks are saved in the existing settings table and survive restarts. After restoring access or credits, an administrator can choose Resume AI matching from the task matching error state. This only clears the block; a new explicit member request checks availability. No database migration is needed.
+The homepage must immediately display available tasks without requiring visitors to register or log in.
 
-Tests: `node --test test/task-matching.test.cjs`. Live account testing requires an activated member session and available tasks; real AI access must be verified after Render configuration.
+
+
+Visitors should be able to:
+
+
+
+- Browse all available tasks.
+
+- View task names and descriptions.
+
+- See exact reward amounts.
+
+- See estimated completion times.
+
+- View task categories.
+
+- See task availability.
+
+- Search and filter tasks.
+
+- Click START TASK.
+
+
+
+When someone clicks START TASK:
+
+
+
+- If not registered, redirect to registration.
+
+- If already registered but not activated, redirect to account activation.
+
+- If activated, open the task instructions.
+
+
+
+==================================================
+
+2. TASK CATEGORIES
+
+
+
+Create a complete task marketplace containing:
+
+
+
+1. TikTok video watching.
+
+2. YouTube video watching.
+
+3. Movie and video watching.
+
+4. Online surveys.
+
+5. Trivia quizzes.
+
+6. Chatting tasks.
+
+7. Social media engagement.
+
+8. Playing games.
+
+9. Advertisement viewing.
+
+10. Daily spin rewards.
+
+11. Article writing.
+
+12. Product promotion.
+
+13. Referral tasks.
+
+14. General online assignments.
+
+
+
+Inspect the reference website for publicly displayed task information.
+
+
+
+Where exact task rewards and durations are publicly available, reproduce those values accurately as reference data.
+
+
+
+Do not invent exact rates or durations. Make every reward and duration editable through the admin dashboard.
+
+
+
+Do not advertise gambling, betting or financial trading as guaranteed earning opportunities.
+
+
+
+==================================================
+
+3. REGISTRATION AND LOGIN
+
+
+
+Create a complete authentication system.
+
+
+
+Registration fields:
+
+
+
+- Full name.
+
+- Email address.
+
+- Phone number.
+
+- Password.
+
+- Confirm password.
+
+- Referral code (optional).
+
+
+
+Include:
+
+
+
+- Login.
+
+- Logout.
+
+- Forgot password.
+
+- Password reset.
+
+- Form validation.
+
+- Secure password hashing.
+
+- Session management.
+
+
+
+==================================================
+
+4. ACCOUNT ACTIVATION
+
+
+
+Introduce an account activation system.
+
+
+
+Activation fee: KES 100 (configurable by admin).
+
+
+
+The activation process should happen after registration.
+
+
+
+Display:
+
+
+
+- Activation fee.
+
+- Payment instructions.
+
+- M-Pesa payment option.
+
+- Payment confirmation status.
+
+
+
+Only activate accounts after successful server-side payment verification.
+
+
+
+Do not accept screenshots as proof of automatic payment.
+
+
+
+==================================================
+
+5. USER DASHBOARD
+
+
+
+After successful login and activation, users should access a professional dashboard displaying:
+
+
+
+- Total earnings.
+
+- Available balance.
+
+- Pending earnings.
+
+- Completed tasks.
+
+- Available tasks.
+
+- Referral earnings.
+
+- Total withdrawals.
+
+- Account activation status.
+
+
+
+Include a recent activity section and transaction history.
+
+
+
+All financial figures must update dynamically from the database.
+
+
+
+==================================================
+
+6. TASK COMPLETION SYSTEM
+
+
+
+Every task must have:
+
+
+
+- Task title.
+
+- Description.
+
+- Reward amount.
+
+- Estimated completion time.
+
+- Instructions.
+
+- START TASK button.
+
+- Submission form.
+
+- Proof upload where required.
+
+- Submission status.
+
+
+
+Statuses:
+
+
+
+- Available.
+
+- In Progress.
+
+- Submitted.
+
+- Under Review.
+
+- Approved.
+
+- Rejected.
+
+
+
+Prevent users from claiming the same task multiple times where the task is limited to one completion per user.
+
+
+
+Admin approval should automatically credit the correct reward to the user's wallet.
+
+
+
+==================================================
+
+7. WALLET AND WITHDRAWALS
+
+
+
+Build a functional wallet system.
+
+
+
+Display:
+
+
+
+- Total earned.
+
+- Available balance.
+
+- Pending balance.
+
+- Withdrawal history.
+
+
+
+Withdrawal methods:
+
+
+
+- M-Pesa.
+
+
+
+Allow users to request withdrawals.
+
+
+
+Include:
+
+
+
+- Configurable minimum withdrawal.
+
+- Withdrawal charges.
+
+- M-Pesa phone number.
+
+- Withdrawal request status.
+
+- Transaction reference.
+
+
+
+Statuses:
+
+
+
+- Pending.
+
+- Processing.
+
+- Paid.
+
+- Rejected.
+
+
+
+Only deduct money according to a secure transaction process. Prevent duplicate withdrawals and negative balances.
+
+
+
+==================================================
+
+8. REFERRAL SYSTEM
+
+
+
+Create a referral programme.
+
+
+
+Every user receives a unique referral link and referral code.
+
+
+
+Display:
+
+
+
+- Total referrals.
+
+- Successful referrals.
+
+- Referral rewards.
+
+- Referral history.
+
+
+
+Allow the administrator to configure referral commissions.
+
+
+
+Only credit legitimate, verified referral rewards.
+
+
+
+==================================================
+
+9. CUSTOMER REVIEWS AND TESTIMONIALS
+
+
+
+THIS SECTION IS VERY IMPORTANT.
+
+
+
+At the bottom of the public homepage, create an attractive customer reviews section.
+
+
+
+The section should look like a genuine online earning platform with professional testimonial cards.
+
+
+
+Include:
+
+
+
+- Customer profile pictures or initials.
+
+- Customer first names.
+
+- Star ratings.
+
+- Written feedback.
+
+- Review dates.
+
+- Verified customer labels where applicable.
+
+
+
+The review section should include feedback about:
+
+
+
+- Successful withdrawals.
+
+- M-Pesa payment experiences.
+
+- Fast payment processing.
+
+- Easy-to-complete tasks.
+
+- Customer support.
+
+- Overall platform experience.
+
+
+
+Example testimonial styles:
+
+
+
+"Received my withdrawal yesterday through M-Pesa. The process was smooth."
+
+
+
+"I love how easy it is to find and complete tasks. The dashboard is also very simple."
+
+
+
+"My withdrawal was processed successfully. Good experience so far."
+
+
+
+"Tasks are easy to understand, and I can track my earnings from my dashboard."
+
+
+
+IMPORTANT:
+
+These are example testimonial styles, not real customer statements. Do not publish fabricated reviews, fake withdrawal claims, invented customers or false verified badges. Start with clearly labelled sample content in development and allow real users to submit reviews after actual platform activity. Only publish verified testimonials with appropriate permission.
+
+
+
+Add a LEAVE A REVIEW button.
+
+
+
+==================================================
+
+10. ADMIN DASHBOARD
+
+
+
+Build a powerful administration panel.
+
+
+
+Administrator should be able to:
+
+
+
+- View all registered users.
+
+- View activated and unactivated accounts.
+
+- Add new tasks.
+
+- Edit tasks.
+
+- Delete tasks.
+
+- Change task rewards.
+
+- Change task durations.
+
+- Enable or disable tasks.
+
+- View task submissions.
+
+- Approve or reject submissions.
+
+- Manage user wallets.
+
+- View transactions.
+
+- Manage withdrawals.
+
+- Process verified payments.
+
+- Manage referrals.
+
+- Manage customer reviews.
+
+- Respond to customer complaints.
+
+- View total platform statistics.
+
+
+
+Admin access must be protected by server-side role permissions.
+
+
+
+==================================================
+
+11. DESIGN AND USER EXPERIENCE
+
+
+
+Maintain the existing PaidTaskHub visual identity.
+
+
+
+Improve the existing interface without destroying its design.
+
+
+
+The website must have:
+
+
+
+- Professional modern appearance.
+
+- Responsive mobile-first design.
+
+- Smooth navigation.
+
+- Attractive task cards.
+
+- Clean typography.
+
+- Professional dashboard charts.
+
+- Consistent buttons.
+
+- Modern icons.
+
+- Smooth animations.
+
+- Fast loading.
+
+- Proper mobile spacing.
+
+
+
+The homepage should have this order:
+
+
+
+1. Navigation bar.
+
+2. Hero section.
+
+3. Platform statistics.
+
+4. Available tasks.
+
+5. Task categories.
+
+6. How it works.
+
+7. Earnings and withdrawal information.
+
+8. Customer testimonials.
+
+9. Frequently asked questions.
+
+10. Footer.
+
+
+
+==================================================
+
+12. DATABASE AND BACKEND
+
+
+
+Inspect my existing backend and preserve working functionality.
+
+
+
+Implement or improve:
+
+
+
+- User authentication.
+
+- Task management.
+
+- Task submissions.
+
+- Wallet management.
+
+- Transaction records.
+
+- Payment verification.
+
+- Withdrawals.
+
+- Referral tracking.
+
+- Reviews.
+
+- Admin permissions.
+
+
+
+Use proper database relationships and server-side validation.
+
+
+
+Never store sensitive payment credentials in frontend code.
+
+
+
+==================================================
+
+13. SECURITY AND RELIABILITY
+
+
+
+Implement:
+
+
+
+- Secure authentication.
+
+- Password hashing.
+
+- Input validation.
+
+- Rate limiting.
+
+- Protected admin routes.
+
+- Secure payment callbacks.
+
+- Duplicate transaction prevention.
+
+- Wallet transaction integrity.
+
+- Protection against unauthorized balance changes.
+
+- Error handling.
+
+- Database backups.
+
+
+
+==================================================
+
+14. IMPORTANT DEVELOPMENT INSTRUCTIONS
+
+
+
+Before making changes:
+
+
+
+1. Inspect the entire uploaded project.
+
+2. Understand the existing architecture.
+
+3. Identify existing working features.
+
+4. Preserve the existing design.
+
+5. Identify missing features.
+
+6. Upgrade the existing files instead of unnecessarily rebuilding everything.
+
+
+
+Do not remove existing functionality.
+
+
+
+Do not create buttons that do nothing.
+
+
+
+Do not use fake payment integrations.
+
+
+
+Do not simulate successful withdrawals in production.
+
+
+
+Every button, form, dashboard statistic and navigation link must work.
+
+
+
+Do not replace real backend functionality with frontend-only demonstrations.
+
+
+
+After implementation:
+
+
+
+- Test registration.
+
+- Test login.
+
+- Test account activation.
+
+- Test payment verification.
+
+- Test task submissions.
+
+- Test reward calculations.
+
+- Test wallet balances.
+
+- Test withdrawal requests.
+
+- Test admin controls.
+
+- Test mobile responsiveness.
+
+
+
+FINAL OBJECTIVE:
+
+
+
+Transform PaidTaskHub into a complete, professional and reliable task-earning marketplace inspired by the functionality of LipaTask while maintaining our existing branding and design.
+
+
+
+The public homepage must allow visitors to see available tasks, rewards and estimated completion times before registration.
+
+
+
+The registration and KES 100 activation process must happen when a visitor attempts to start a task.
+
+
+
+The platform must be fully connected to its backend and database, not just a beautiful frontend demonstration.
+
+
+
+Prioritize functionality, accuracy, security and professional presentation.
+
+This project was built with [Lovable](https://lovable.dev).
+
+## Build with Lovable
+
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/3fba03a5-f299-4249-a6d0-2c64c8086fad).
+
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+
+## Development
+
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
+```
